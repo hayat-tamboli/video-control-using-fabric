@@ -1,73 +1,92 @@
-#-----------------------------------------------------------------------------
-#Step - 1  -Import Libraries and capture camera
+# when you spin it hard the video speeds up
 
-#-----------------------------------------------------------------------------
-
-import cv2 as cv
-import numpy as np
-import math
+import cv2
 import serial
 import serial.serialutil
-import time
-ser = None
-try:
-    ser = serial.Serial(port='COM7', baudrate=115200)
-except serial.serialutil.SerialException as e:
-    print("Could not open port: ", str(e))
+import threading
 
-# Open the video file
-cap = cv.VideoCapture('myvideotoloop.mp4')
-fps = cap.get(cv.CAP_PROP_FPS)
-speedup_factor = 2.0
-new_fps = fps * speedup_factor
-frame_width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
-frame_height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+line = "0"
 
-# fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Use 'mp4v' as the fourcc format for MP4 videos
-# out = cv2.VideoWriter('output_video.mp4', fourcc, new_fps, (frame_width, frame_height))
-
-# Read the first frame
-ret, frame = cap.read()
-
-def rescaleFrame(frame, scale=0.75):
-    width = int(frame.shape[1] * scale)
-    height = int(frame.shape[0] * scale)
-    dimensions = (width, height)
-    return cv.resize(frame, dimensions, interpolation=cv.INTER_AREA)
-
-allframes = []
-
-# Loop through each frame in the video
-while ret:
-    frame = rescaleFrame(frame)
-    # out.write(frame)
-    # cv.imshow('Video', blur)
-    allframes.append(frame)
-
-    # Read the next frame
-    ret, frame = cap.read()
-
-i=0
-try:
+# Define a function to receive Arduino data
+def receive_data_from_arduino():
+    # Your Arduino data receiving logic goes here
+    ser = None
+    try:
+        ser = serial.Serial(port='COM7', baudrate=9600)
+    except serial.serialutil.SerialException as e:
+        print("Could not open port: ", str(e))
+        return
     while True:
-        # Read line from serial port
-        line = ser.readline().decode().strip()
-        print("Received:", line)  # Print received data
+        global line
+        line = str(ser.readline().decode().strip())
+        print(line)
+    
 
-        frametoShow = allframes[i]
-        if line == "winking":
-            frametoShow = cv.GaussianBlur(frametoShow, (7, 7), cv.BORDER_DEFAULT)
-        cv.imshow('Video', frametoShow)
-        if cv.waitKey(28) & 0xFF == ord('q'):
+
+def run_video():
+    
+    # Path to the prerecorded video
+    video_path = 'myvideo.mp4'
+
+    # Open the video file
+    cap = cv2.VideoCapture(video_path)
+
+    # Check if the video opened successfully
+    if not cap.isOpened():
+        print("Error: Unable to open video file")
+        return
+
+    # Get the video properties
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    speed_up_factor = 1
+    reverse = False
+
+    while True:
+        # Read a frame from the video
+        ret, frame = cap.read()
+
+        # Check if the frame was read successfully
+        if not ret:
             break
-        i += 1
 
-except KeyboardInterrupt:
-    # Close serial connection when script is interrupted
-    ser.close()
-    print("Serial connection closed.")
+        # Display the frame
+        cv2.imshow('Video', frame)
 
-# Release the video capture object and close all windows
-cap.release()
-# out.release()
-cv.destroyAllWindows()
+        # Calculate delay based on speed-up factor
+        delay = int(1000 / (fps * speed_up_factor))
+
+        # Wait for key press
+        key = cv2.waitKey(delay)
+
+        # Check if the 'Z' key was pressed
+        if ((key == ord('z'))|(line == "1")):
+            speed_up_factor = 5 
+        else:
+            speed_up_factor = 1
+        if (key == ord('x')):
+            reverse = not reverse
+        if key == 27:  # If 'Esc' key was pressed
+            break
+        if reverse:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 2)
+
+    # Release the video capture object and close all windows
+    cap.release()
+    cv2.destroyAllWindows()
+
+# if __name__ == "__main__":
+#     main()
+
+# Create two threads, one for each task
+arduino_thread = threading.Thread(target=receive_data_from_arduino)
+video_thread = threading.Thread(target=run_video)
+
+# Start both threads
+arduino_thread.start()
+video_thread.start()
+
+
+# Wait for both threads to finish
+arduino_thread.join()
+video_thread.join()
