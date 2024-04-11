@@ -12,7 +12,7 @@ intenseSpin = 0 # -1 means fast forward
 def receive_data_from_arduino():
     ser = None
     try:
-        ser = serial.Serial(port='COM7', baudrate=9600)
+        ser = serial.Serial(port='COM8', baudrate=9600)
     except serial.serialutil.SerialException as e:
         print("Could not open port: ", str(e))
         return
@@ -28,7 +28,7 @@ def receive_data_from_arduino():
 
 
 def run_video():
-    video_path = 'myvideo.mp4'
+    video_path = 'cinemagraph 1.mp4'
     cap = cv2.VideoCapture(video_path)
 
     if not cap.isOpened():
