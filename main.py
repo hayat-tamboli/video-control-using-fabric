@@ -40,7 +40,9 @@ def run_video():
         ret, frame = cap.read()
 
         if not ret:
-            break
+            print("looping back to the start of the video")
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = cap.read()
 
         cv2.imshow('Video', frame)
 
