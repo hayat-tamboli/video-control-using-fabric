@@ -21,12 +21,12 @@ def receive_data_from_arduino():
         line = str(ser.readline().decode().strip())
         print(line)
         global folded
-        if(line.find("play")):
+        if(line.find("play") == -1):
             folded = False
         else:
             folded = True
         global intenseSpin
-        if(line.find("normalspeed")):
+        if(line.find("normalspeed") == -1):
             intenseSpin = False
         else:
             intenseSpin = True
@@ -65,13 +65,13 @@ def run_video():
         key = cv2.waitKey(delay)
 
         # spped up functionlaity
-        if (intenseSpin):
+        if (not intenseSpin):
             speed_up_factor = 8
         else:
             speed_up_factor = 1
         
         # Play pause functionality
-        if(folded):
+        if(not folded):
             cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 1)
 
         # Check if the 'X' key was pressed
