@@ -5,7 +5,9 @@ import serial
 import serial.serialutil
 import threading
 
-line = "0"
+line = ""
+playPause = 0 # -1 means play
+intenseSpin = 0 # -1 means fast forward
 
 def receive_data_from_arduino():
     ser = None
@@ -18,6 +20,10 @@ def receive_data_from_arduino():
         global line
         line = str(ser.readline().decode().strip())
         print(line)
+        global playPause
+        playPause = line.find("pause")
+        global intenseSpin
+        intenseSpin = line.find("normalspeed")
     
 
 
@@ -52,11 +58,16 @@ def run_video():
         # Wait for key press
         key = cv2.waitKey(delay)
 
-        # Check if the 'Z' key was pressed or if the line is "1"
-        if ((key == ord('z'))|(line == "1")):
-            speed_up_factor = 5 
+        # spped up functionlaity
+        if (intenseSpin != -1):
+            speed_up_factor = 8
         else:
             speed_up_factor = 1
+        
+        # Play pause functionality
+        if(playPause != -1):
+            cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 1)
+
         # Check if the 'X' key was pressed
         if (key == ord('x')):
             reverse = not reverse
