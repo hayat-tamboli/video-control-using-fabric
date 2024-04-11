@@ -6,8 +6,8 @@ import serial.serialutil
 import threading
 
 line = ""
-playPause = 0 # -1 means play
-intenseSpin = 0 # -1 means fast forward
+folded = True # True make the video paused, False make the video play
+intenseSpin = False # True makes the video Speed up, False makes the video play at normal speed
 
 def receive_data_from_arduino():
     ser = None
@@ -20,10 +20,16 @@ def receive_data_from_arduino():
         global line
         line = str(ser.readline().decode().strip())
         print(line)
-        global playPause
-        playPause = line.find("pause")
+        global folded
+        if(line.find("play")):
+            folded = False
+        else:
+            folded = True
         global intenseSpin
-        intenseSpin = line.find("normalspeed")
+        if(line.find("normalspeed")):
+            intenseSpin = False
+        else:
+            intenseSpin = True
     
 
 
@@ -59,13 +65,13 @@ def run_video():
         key = cv2.waitKey(delay)
 
         # spped up functionlaity
-        if (intenseSpin != -1):
+        if (intenseSpin):
             speed_up_factor = 8
         else:
             speed_up_factor = 1
         
         # Play pause functionality
-        if(playPause != -1):
+        if(folded):
             cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 1)
 
         # Check if the 'X' key was pressed
