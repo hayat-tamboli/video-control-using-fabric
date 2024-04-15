@@ -1,13 +1,25 @@
 # when you spin it hard the video speeds up
 
+import random
 import cv2
 import serial
 import serial.serialutil
 import threading
+import numpy as np
+import time
+
+# Start the timer
+start_time = time.time()
 
 line = ""
 folded = True # True make the video paused, False make the video play
 intenseSpin = False # True makes the video Speed up, False makes the video play at normal speed
+flip = False # True flips the video, False does not flip the video
+
+animatedGlitch = False
+animation_timer = 1000
+amimationStartTimer = 400;
+animationStopTimer = amimationStartTimer + animation_timer;
 
 def receive_data_from_arduino():
     ser = None
@@ -31,10 +43,30 @@ def receive_data_from_arduino():
         else:
             intenseSpin = True
     
+def apply_glitch_effect(frame, translation_amount):
+    # Duplicate the frame
+    glitch_frame = frame.copy()
 
+    # Apply translation to one of the copies
+    rows, cols, _ = glitch_frame.shape
+    M = np.float32([[1, 0, translation_amount], [0, 1, translation_amount]])
+    glitch_frame = cv2.warpAffine(glitch_frame, M, (cols, rows))
+
+    # Blend the original frame and glitched frame together
+    alpha = 0.5  # Adjust blending level
+    result = cv2.addWeighted(frame, alpha, glitch_frame, 1 - alpha, 0)
+
+    return result
+
+def flipVideo(frame):
+    return cv2.flip(frame, 1)
 
 def run_video():
-    video_path = 'cinemagraph 1.mp4'
+    global animatedGlitch
+    global amimationStartTimer
+    global animationStopTimer
+
+    video_path = 'videos/cinemagraph 1.mp4'
     cap = cv2.VideoCapture(video_path)
 
     if not cap.isOpened():
@@ -50,12 +82,29 @@ def run_video():
     while True:
         # Read a frame from the video
         ret, frame = cap.read()
+        current_time = round((time.time() - start_time) * 1000)
+        print(current_time)
+
+        if(current_time> amimationStartTimer and current_time < animationStopTimer):
+            animatedGlitch = True
+            cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 1)
+        else:
+            if(current_time > amimationStartTimer):
+                cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) + random.randint(1, 20))
+                amimationStartTimer += 2000;
+                animationStopTimer = amimationStartTimer + animation_timer
+            animatedGlitch = False
 
         if not ret:
             print("looping back to the start of the video")
             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             ret, frame = cap.read()
 
+        if animatedGlitch:
+            frame = apply_glitch_effect(frame, random.randint(-20, 20))
+
+        if flip:
+            frame = flipVideo(frame)
         cv2.imshow('Video', frame)
 
         # defining the framerate
