@@ -7,38 +7,47 @@ import serial.serialutil
 import threading
 import numpy as np
 import time
+import matplotlib.pyplot as plt
 
 # Start the timer
 start_time = time.time()
 
-line = ""
-folded = True # True make the video paused, False make the video play
+line1 = ""
+line2 = ""
+folded = False # True make the video paused, False make the video play
 intenseSpin = False # True makes the video Speed up, False makes the video play at normal speed
 flip = False # True flips the video, False does not flip the video
+grayscale = False # True makes the video grayscale, False makes the video colored
+fabricCompressionOrCrumble = "";
 
 animatedGlitch = False
-animation_timer = 1000
-amimationStartTimer = 400;
-animationStopTimer = amimationStartTimer + animation_timer;
 
 def receive_data_from_arduino():
-    ser = None
+    ser1 = None
+    ser2 = None
     try:
-        ser = serial.Serial(port='COM8', baudrate=9600)
+        ser1 = serial.Serial(port='COM8', baudrate=9600)
     except serial.serialutil.SerialException as e:
         print("Could not open port: ", str(e))
         return
+    # try:
+    #     ser2 = serial.Serial(port='COM9', baudrate=38400)
+    # except serial.serialutil.SerialException as e:
+    #     print("Could not open port: ", str(e))
+    #     return
     while True:
-        global line
-        line = str(ser.readline().decode().strip())
-        print(line)
+        global line1
+        # global line2
+        line1 = str(ser1.readline().decode().strip())
+        # line2 = str(ser2.readline().decode().strip())
+        print(line1)
         global folded
-        if(line.find("play") == -1):
+        if(line1.find("play") == -1):
             folded = False
         else:
             folded = True
         global intenseSpin
-        if(line.find("normalspeed") == -1):
+        if(line1.find("normalspeed") == -1):
             intenseSpin = False
         else:
             intenseSpin = True
@@ -61,11 +70,50 @@ def apply_glitch_effect(frame, translation_amount):
 def flipVideo(frame):
     return cv2.flip(frame, 1)
 
-def run_video():
-    global animatedGlitch
-    global amimationStartTimer
-    global animationStopTimer
+def grayscaleVideo(frame):
+    return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
+def pixelateVideo(frame):
+    # Get input size
+    height, width = frame.shape[:2]
+
+    # Desired "pixelated" size
+    w, h = (128, 128)
+
+    # Resize input to "pixelated" size
+    temp = cv2.resize(frame, (w, h), interpolation=cv2.INTER_LINEAR)
+
+    # Initialize output image
+    frame = cv2.resize(temp, (width, height), interpolation=cv2.INTER_NEAREST)
+
+    return frame
+
+def applySharpening(image, display=True):
+    
+    # Get the kernel required for the sharpening effect.
+    sharpening_kernel = np.array([[-1, -1, -1],
+                                  [-1, 9.2, -1],
+                                  [-1, -1, -1]])
+    
+    # Apply the sharpening filter on the image.
+    output_image = cv2.filter2D(src=image, ddepth=-1, 
+                                kernel=sharpening_kernel)
+    
+    # Check if the original input image and the output image are specified to be displayed.
+    if display:
+        
+        # Display the original input image and the output image.
+        plt.figure(figsize=[15,15])
+        plt.subplot(121);plt.imshow(image[:,:,::-1]);plt.title("Input Image");plt.axis('off');
+        plt.subplot(122);plt.imshow(output_image[:,:,::-1]);plt.title("Output Image");plt.axis('off');
+        
+    # Otherwise.
+    else:
+    
+        # Return the output image.
+        return output_image
+
+def run_video():
     video_path = 'videos/cinemagraph 1.mp4'
     cap = cv2.VideoCapture(video_path)
 
@@ -82,29 +130,41 @@ def run_video():
     while True:
         # Read a frame from the video
         ret, frame = cap.read()
-        current_time = round((time.time() - start_time) * 1000)
-        print(current_time)
-
-        if(current_time> amimationStartTimer and current_time < animationStopTimer):
-            animatedGlitch = True
-            cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 1)
-        else:
-            if(current_time > amimationStartTimer):
-                cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) + random.randint(1, 20))
-                amimationStartTimer += 2000;
-                animationStopTimer = amimationStartTimer + animation_timer
-            animatedGlitch = False
-
         if not ret:
-            print("looping back to the start of the video")
             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             ret, frame = cap.read()
+        # current_time = round((time.time() - start_time) * 1000)
+        # print(current_time)
 
-        if animatedGlitch:
+        # if(current_time> amimationStartTimer and current_time < animationStopTimer):
+        #     # pls change this when in production
+        #     animatedGlitch = true
+        #     # cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 1)
+        # else:
+        #     if(current_time > amimationStartTimer):
+        #         # cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) + random.randint(1, 20))
+        #         amimationStartTimer += 2000;
+        #         animationStopTimer = amimationStartTimer + animation_timer
+        #     animatedGlitch = False
+
+
+        if line1 == "closed":
             frame = apply_glitch_effect(frame, random.randint(-20, 20))
+            cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 1)
 
         if flip:
             frame = flipVideo(frame)
+
+        if grayscale:
+            frame = grayscaleVideo(frame)
+        
+        # frame = cv2.bilateralFilter(frame,15, 75, 75)
+
+
+        if pixelateVideo:
+            frame = pixelateVideo(frame)
+        
+        # Display the frame
         cv2.imshow('Video', frame)
 
         # defining the framerate
@@ -120,7 +180,7 @@ def run_video():
             speed_up_factor = 1
         
         # Play pause functionality
-        if(not folded):
+        if(folded):
             cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 1)
 
         # Check if the 'X' key was pressed
