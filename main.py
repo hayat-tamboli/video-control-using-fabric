@@ -43,16 +43,16 @@ def receive_data_from_arduino():
     except serial.serialutil.SerialException as e:
         print("Could not open port: ", str(e))
         return
-    # try:
-        # ser2 = serial.Serial(port='COM7', baudrate=9600)
-    # except serial.serialutil.SerialException as e:
-        # print("Could not open port: ", str(e))
-        # return
+    try:
+        ser2 = serial.Serial(port='COM7', baudrate=9600)
+    except serial.serialutil.SerialException as e:
+        print("Could not open port: ", str(e))
+        return
     while True:
         global line1
+        global line2
         global slowDown
         global speedup
-        global line2
         global words
         global accel3orientation
         global accel4orientation
@@ -70,18 +70,25 @@ def receive_data_from_arduino():
             # Handle the error as needed, e.g., logging or continuing with a placeholder value
             line1 = "Error: Unable to decode"
 
-        words = line1.split()
+        try:
+            line2 = ser2.readline().decode('utf-8', errors='replace').strip()
+        except UnicodeDecodeError as e:
+            print(f"UnicodeDecodeError: {e}")
+            # Handle the error as needed, e.g., logging or continuing with a placeholder value
+            line2 = "Error: Unable to decode"
+            
+        mainData = line2 + " " + line1
+        words = mainData.split()
         print(words)
         ignoreAccelerometer = False
-        if(len(words) > 4):
-            accel3orientation = words[0]
-            accel4orientation = words[1]
-            isStretching = words[2]
-            isCrumbling = words[3]
-            isCompressing = words[4]
-        
-        # line2 = str(ser2.readline().decode().strip())
-        # print(line2)
+        if(len(words) > 6):
+            accel1orientation = words[0]
+            accel2orientation = words[1]
+            accel3orientation = words[2]
+            accel4orientation = words[3]
+            isStretching = words[4]
+            isCrumbling = words[5]
+            isCompressing = words[6]
         
         
         if(isCrumbling == "crumble"):
@@ -201,8 +208,11 @@ def run_video():
     global flip
     global reverse
     
-    video_path = 'videos/walking.mp4'
-    cap = cv2.VideoCapture(video_path)
+    video_path1 = 'videos/walking.mp4'
+    video_path2 = 'videos/umbrella.mp4'
+    video_path3 = 'videos/briefcase.mp4'
+    
+    cap = cv2.VideoCapture(video_path2)
 
     if not cap.isOpened():
         print("Error: Unable to open video file")
