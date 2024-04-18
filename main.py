@@ -6,8 +6,11 @@ import serial
 import serial.serialutil
 import threading
 import numpy as np
-# import time
+import time
 import matplotlib.pyplot as plt
+
+from datafromr4 import readDataFromR4, words_queue1
+from datafromunor3 import readDataFromR3, words_queue2
 
 # Start the timer
 # start_time = time.time()
@@ -25,6 +28,8 @@ slowDown = False # True makes the video slow down, False makes the video play at
 pixelate = False # True makes the video pixelated, False makes the video not pixelated
 count = 0
 words = []
+words1 = []
+words2 = []
 accel1orientation = "1-Z-down"
 accel2orientation = "2-Z-down"
 accel3orientation = "3-Z-down"
@@ -36,99 +41,118 @@ reverse = False
 
 
 def receive_data_from_arduino():
-    ser1 = None
-    ser2 = None
-    try:
-        ser1 = serial.Serial(port='COM8', baudrate=9600)
-    except serial.serialutil.SerialException as e:
-        print("Could not open port: ", str(e))
-        return
-    try:
-        ser2 = serial.Serial(port='COM7', baudrate=9600)
-    except serial.serialutil.SerialException as e:
-        print("Could not open port: ", str(e))
-        return
+    global words1
+    global words2
     while True:
-        global line1
-        global line2
-        global slowDown
-        global speedup
-        global words
-        global accel3orientation
-        global accel4orientation
-        global isStretching
-        global isCompressing
-        global isCrumbling
-        global glitch
-        global folded
-        global flip
-        global reverse
-        try:
-            line1 = ser1.readline().decode('utf-8', errors='replace').strip()
-        except UnicodeDecodeError as e:
-            print(f"UnicodeDecodeError: {e}")
-            # Handle the error as needed, e.g., logging or continuing with a placeholder value
-            line1 = "Error: Unable to decode"
+        # Check if there is data in the queue
+        if not words_queue1.empty():
+            words1 = words_queue1.get()
+            # print("Received words:", words1)
+        else:
+            print("No data in the queue 1")
+        
+        if not words_queue2.empty():
+            words2 = words_queue2.get()
+            # print("Received words:", words2)
+        else:
+            print("No data in the queue 2")
+        
+        time.sleep(0.2)
+    # readDataFromR4()
+    # readDataFromR3()
+    # ser1 = None
+    # ser2 = None
+    # try:
+    #     ser1 = serial.Serial(port='COM8', baudrate=9600)
+    # except serial.serialutil.SerialException as e:
+    #     print("Could not open port: ", str(e))
+    #     return
+    # try:
+    #     ser2 = serial.Serial(port='COM7', baudrate=9600)
+    # except serial.serialutil.SerialException as e:
+    #     print("Could not open port: ", str(e))
+    #     return
+    # while True:
+    #     global line1
+    #     global line2
+    #     global slowDown
+    #     global speedup
+    #     global words
+    #     global accel3orientation
+    #     global accel4orientation
+    #     global isStretching
+    #     global isCompressing
+    #     global isCrumbling
+    #     global glitch
+    #     global folded
+    #     global flip
+    #     global reverse
+        # try:
+        #     line1 = ser1.readline().decode('utf-8', errors='replace').strip()
+        # except UnicodeDecodeError as e:
+        #     print(f"UnicodeDecodeError: {e}")
+        #     # Handle the error as needed, e.g., logging or continuing with a placeholder value
+        #     line1 = "Error: Unable to decode"
 
-        try:
-            line2 = ser2.readline().decode('utf-8', errors='replace').strip()
-        except UnicodeDecodeError as e:
-            print(f"UnicodeDecodeError: {e}")
-            # Handle the error as needed, e.g., logging or continuing with a placeholder value
-            line2 = "Error: Unable to decode"
+        # try:
+        #     line2 = ser2.readline().decode('utf-8', errors='replace').strip()
+        # except UnicodeDecodeError as e:
+        #     print(f"UnicodeDecodeError: {e}")
+        #     # Handle the error as needed, e.g., logging or continuing with a placeholder value
+        #     line2 = "Error: Unable to decode"
             
-        mainData = line2 + " " + line1
-        words = mainData.split()
-        print(words)
-        ignoreAccelerometer = False
-        if(len(words) > 6):
-            accel1orientation = words[0]
-            accel2orientation = words[1]
-            accel3orientation = words[2]
-            accel4orientation = words[3]
-            isStretching = words[4]
-            isCrumbling = words[5]
-            isCompressing = words[6]
+        # mainData = line2 + " " + line1
+        # words = mainData.split()
+        # print(words)
+        # ignoreAccelerometer = False
+        # if(len(words) > 6):
+        #     accel1orientation = words[0]
+        #     accel2orientation = words[1]
+        #     accel3orientation = words[2]
+        #     accel4orientation = words[3]
+        #     isStretching = words[4]
+        #     isCrumbling = words[5]
+        #     isCompressing = words[6]
         
         
-        if(isCrumbling == "crumble"):
-            glitch = True
-        else:
-            glitch = False
+        # if(isCrumbling == "crumble"):
+        #     glitch = True
+        # else:
+        #     glitch = False
         
-        glitch = False
+        # glitch = False
         
-        if(isStretching == "stretching"):
-            glitch = False
-            slowDown = True
-        else:
-            slowDown = False
+        # if(isStretching == "stretching"):
+        #     glitch = False
+        #     slowDown = True
+        # else:
+        #     slowDown = False
         
-        if(isCompressing == "compress"):
-            speedup = True
-            ignoreAccelerometer = True
-            slowDown = False
-        else:
-            speedup = False
-        if(not ignoreAccelerometer):
-            if(accel3orientation == "3-Z-up" and accel4orientation == "4-Z-up"):
-                folded = False
-                reverse = False
-            else:
-                if(isCrumbling == "crumble"):
-                    glitch = False
-                    reverse = True
-                else:
-                    glitch = False
-                folded = True
-                glitch = False
-                speedup = False
-                slowDown = False
-                if(accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down"):
-                    flip = True
-                    folded = False
-                else:
-                    flip = False
+        # if(isCompressing == "compress"):
+        #     speedup = True
+        #     ignoreAccelerometer = True
+        #     slowDown = False
+        # else:
+        #     speedup = False
+        # if(not ignoreAccelerometer):
+        #     if(accel3orientation == "3-Z-up" and accel4orientation == "4-Z-up"):
+        #         folded = False
+        #         reverse = False
+        #     else:
+        #         if(isCrumbling == "crumble"):
+        #             glitch = False
+        #             reverse = True
+        #         else:
+        #             glitch = False
+        #         folded = True
+        #         glitch = False
+        #         speedup = False
+        #         slowDown = False
+        #         if(accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down"):
+        #             flip = True
+        #             folded = False
+        #         else:
+        #             flip = False
             
         # if(line1.find("play") == -1):
         #     folded = False
@@ -139,6 +163,70 @@ def receive_data_from_arduino():
         #     intenseSpin = False
         # else:
         #     intenseSpin = True
+
+def analyzeData():
+    global words
+    global words1
+    global words2
+    global accel1orientation
+    global accel2orientation
+    global accel3orientation
+    global accel4orientation
+    global isStretching
+    global isCompressing
+    global isCrumbling
+    global glitch
+    global folded
+    global flip
+    global slowDown
+    global speedup
+    
+    
+    while True:
+        words = words1 + words2
+        print("Words: ", words)
+        if(len(words) > 6):
+            accel1orientation = words[0]
+            accel2orientation = words[1]
+            accel3orientation = words[2]
+            accel4orientation = words[3]
+            isStretching = words[4]
+            isCrumbling = words[5]
+            isCompressing = words[6]
+            
+        if(isCrumbling == "crumble"):
+            if(accel1orientation == "1-Z-up" and accel2orientation == "2-Z-up" and accel3orientation == "3-Z-up" and accel4orientation == "4-Z-up"):
+                pass
+            else:
+                glitch = True
+        else:
+            glitch = False
+        
+        if(isStretching == "stretching"):
+            slowDown = True
+            glitch = False
+        else:
+            slowDown = False
+            
+        if(isCompressing == "compress"):
+            speedup = True
+            glitch = False
+        else:
+            speedup = False
+            
+        if(accel1orientation == "1-Z-up" and accel2orientation == "2-Z-up" and accel3orientation == "3-Z-up" and accel4orientation == "4-Z-up"):
+            folded = False
+        else:
+            # if()
+            folded = True
+        
+        if(accel1orientation == "1-Z-down" and accel2orientation == "2-Z-down" and accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down"):
+            flip = False
+        else:
+            flip = True
+            
+        
+        time.sleep(0.2)
     
 def apply_glitch_effect(frame, translation_amount: int):
     # Duplicate the frame
@@ -269,9 +357,6 @@ def run_video():
         if (slowDown):
             speed_up_factor = 0.3
         
-        
-        
-        
         # Play pause functionality
         if(folded):
             cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 1)
@@ -292,10 +377,19 @@ def run_video():
 
 # to run 2 loops at the same time
 arduino_thread = threading.Thread(target=receive_data_from_arduino)
+data_analysis_thread = threading.Thread(target=analyzeData)
+arduino_thread1 = threading.Thread(target=readDataFromR4)
+arduino_thread2 = threading.Thread(target=readDataFromR3)
 video_thread = threading.Thread(target=run_video)
 
 arduino_thread.start()
+arduino_thread1.start()
+arduino_thread2.start()
+data_analysis_thread.start()
 video_thread.start()
 
 arduino_thread.join()
+arduino_thread1.join()
+arduino_thread2.join()
+data_analysis_thread.join()
 video_thread.join()
