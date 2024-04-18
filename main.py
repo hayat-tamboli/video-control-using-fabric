@@ -6,21 +6,34 @@ import serial
 import serial.serialutil
 import threading
 import numpy as np
-import time
+# import time
 import matplotlib.pyplot as plt
 
 # Start the timer
-start_time = time.time()
+# start_time = time.time()
 
 line1 = ""
 line2 = ""
 folded = False # True make the video paused, False make the video play
-intenseSpin = False # True makes the video Speed up, False makes the video play at normal speed
+speedup = False # True makes the video Speed up, False makes the video play at normal speed
 flip = False # True flips the video, False does not flip the video
 grayscale = False # True makes the video grayscale, False makes the video colored
-fabricCompressionOrCrumble = "";
+glitch = False # True makes the video glitch, False does not make the video glitch
+fabricCompressionOrCrumbleorStretch = "" # "fabricCompression" makes the video fabric compression, "crumble" makes the video crumble
+wasGlitching = False
+slowDown = False # True makes the video slow down, False makes the video play at normal speed
+pixelate = False # True makes the video pixelated, False makes the video not pixelated
+count = 0
+words = []
+accel1orientation = "1-Z-down"
+accel2orientation = "2-Z-down"
+accel3orientation = "3-Z-down"
+accel4orientation = "4-Z-down"
+isStretching = False
+isCompressing = False
+isCrumbling = False
+reverse = False
 
-animatedGlitch = False
 
 def receive_data_from_arduino():
     ser1 = None
@@ -31,35 +44,103 @@ def receive_data_from_arduino():
         print("Could not open port: ", str(e))
         return
     # try:
-    #     ser2 = serial.Serial(port='COM9', baudrate=38400)
+        # ser2 = serial.Serial(port='COM7', baudrate=9600)
     # except serial.serialutil.SerialException as e:
-    #     print("Could not open port: ", str(e))
-    #     return
+        # print("Could not open port: ", str(e))
+        # return
     while True:
         global line1
-        # global line2
-        line1 = str(ser1.readline().decode().strip())
-        # line2 = str(ser2.readline().decode().strip())
-        print(line1)
+        global slowDown
+        global speedup
+        global line2
+        global words
+        global accel3orientation
+        global accel4orientation
+        global isStretching
+        global isCompressing
+        global isCrumbling
+        global glitch
         global folded
-        if(line1.find("play") == -1):
-            folded = False
+        global flip
+        global reverse
+        try:
+            line1 = ser1.readline().decode('utf-8', errors='replace').strip()
+        except UnicodeDecodeError as e:
+            print(f"UnicodeDecodeError: {e}")
+            # Handle the error as needed, e.g., logging or continuing with a placeholder value
+            line1 = "Error: Unable to decode"
+
+        words = line1.split()
+        print(words)
+        ignoreAccelerometer = False
+        if(len(words) > 4):
+            accel3orientation = words[0]
+            accel4orientation = words[1]
+            isStretching = words[2]
+            isCrumbling = words[3]
+            isCompressing = words[4]
+        
+        # line2 = str(ser2.readline().decode().strip())
+        # print(line2)
+        
+        
+        if(isCrumbling == "crumble"):
+            glitch = True
         else:
-            folded = True
-        global intenseSpin
-        if(line1.find("normalspeed") == -1):
-            intenseSpin = False
+            glitch = False
+        
+        glitch = False
+        
+        if(isStretching == "stretching"):
+            glitch = False
+            slowDown = True
         else:
-            intenseSpin = True
+            slowDown = False
+        
+        if(isCompressing == "compress"):
+            speedup = True
+            ignoreAccelerometer = True
+            slowDown = False
+        else:
+            speedup = False
+        if(not ignoreAccelerometer):
+            if(accel3orientation == "3-Z-up" and accel4orientation == "4-Z-up"):
+                folded = False
+                reverse = False
+            else:
+                if(isCrumbling == "crumble"):
+                    glitch = False
+                    reverse = True
+                else:
+                    glitch = False
+                folded = True
+                glitch = False
+                speedup = False
+                slowDown = False
+                if(accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down"):
+                    flip = True
+                    folded = False
+                else:
+                    flip = False
+            
+        # if(line1.find("play") == -1):
+        #     folded = False
+        # else:
+        #     folded = True
+        # global intenseSpin
+        # if(line1.find("normalspeed") == -1):
+        #     intenseSpin = False
+        # else:
+        #     intenseSpin = True
     
-def apply_glitch_effect(frame, translation_amount):
+def apply_glitch_effect(frame, translation_amount: int):
     # Duplicate the frame
     glitch_frame = frame.copy()
 
     # Apply translation to one of the copies
     rows, cols, _ = glitch_frame.shape
-    M = np.float32([[1, 0, translation_amount], [0, 1, translation_amount]])
-    glitch_frame = cv2.warpAffine(glitch_frame, M, (cols, rows))
+    M = np.float32([[1, 0, translation_amount], [0, 1, translation_amount]]) # type: ignore
+    glitch_frame = cv2.warpAffine(glitch_frame, M, (cols, rows)) # type: ignore
 
     # Blend the original frame and glitched frame together
     alpha = 0.5  # Adjust blending level
@@ -103,7 +184,7 @@ def applySharpening(image, display=True):
     if display:
         
         # Display the original input image and the output image.
-        plt.figure(figsize=[15,15])
+        plt.figure(figsize=(15,15))
         plt.subplot(121);plt.imshow(image[:,:,::-1]);plt.title("Input Image");plt.axis('off');
         plt.subplot(122);plt.imshow(output_image[:,:,::-1]);plt.title("Output Image");plt.axis('off');
         
@@ -114,7 +195,13 @@ def applySharpening(image, display=True):
         return output_image
 
 def run_video():
-    video_path = 'videos/cinemagraph 1.mp4'
+    global wasGlitching
+    global glitch
+    global folded
+    global flip
+    global reverse
+    
+    video_path = 'videos/walking.mp4'
     cap = cv2.VideoCapture(video_path)
 
     if not cap.isOpened():
@@ -133,35 +220,24 @@ def run_video():
         if not ret:
             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             ret, frame = cap.read()
-        # current_time = round((time.time() - start_time) * 1000)
-        # print(current_time)
-
-        # if(current_time> amimationStartTimer and current_time < animationStopTimer):
-        #     # pls change this when in production
-        #     animatedGlitch = true
-        #     # cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 1)
-        # else:
-        #     if(current_time > amimationStartTimer):
-        #         # cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) + random.randint(1, 20))
-        #         amimationStartTimer += 2000;
-        #         animationStopTimer = amimationStartTimer + animation_timer
-        #     animatedGlitch = False
 
 
-        if line1 == "closed":
+        if glitch:
             frame = apply_glitch_effect(frame, random.randint(-20, 20))
             cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 1)
+            wasGlitching = True
+            
+        if(glitch and wasGlitching):
+            cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) + random.randint(1, 20))
+            wasGlitching = False;
 
-        if flip:
-            frame = flipVideo(frame)
+        # if flip:
+        #     frame = flipVideo(frame)
 
         if grayscale:
             frame = grayscaleVideo(frame)
-        
-        # frame = cv2.bilateralFilter(frame,15, 75, 75)
 
-
-        if pixelateVideo:
+        if pixelate:
             frame = pixelateVideo(frame)
         
         # Display the frame
@@ -174,22 +250,29 @@ def run_video():
         key = cv2.waitKey(delay)
 
         # spped up functionlaity
-        if (not intenseSpin):
+        if (speedup):
             speed_up_factor = 8
         else:
             speed_up_factor = 1
+            
+            
+        if (slowDown):
+            speed_up_factor = 0.3
+        
+        
+        
         
         # Play pause functionality
         if(folded):
             cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 1)
 
         # Check if the 'X' key was pressed
-        if (key == ord('x')):
-            reverse = not reverse
+        # if (key == ord('x')):
+        #     reverse = not reverse
         if key == 27:  # If 'Esc' key was pressed
             break
-        if reverse:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 2)
+        # if reverse:
+            # cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 2)
 
     cap.release()
     cv2.destroyAllWindows()
