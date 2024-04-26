@@ -27,3 +27,4 @@ def readDataFromR4():
         # print(words)
         words_queue1.put(words)
         
+# readDataFromR4()

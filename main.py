@@ -38,6 +38,7 @@ isStretching = False
 isCompressing = False
 isCrumbling = False
 reverse = False
+crumbleCount = 0
 
 
 def receive_data_from_arduino():
@@ -49,120 +50,15 @@ def receive_data_from_arduino():
             words1 = words_queue1.get()
             # print("Received words:", words1)
         else:
-            print("No data in the queue 1")
+            words1 = words1
         
         if not words_queue2.empty():
             words2 = words_queue2.get()
             # print("Received words:", words2)
         else:
-            print("No data in the queue 2")
+            words2 = words2
         
-        time.sleep(0.2)
-    # readDataFromR4()
-    # readDataFromR3()
-    # ser1 = None
-    # ser2 = None
-    # try:
-    #     ser1 = serial.Serial(port='COM8', baudrate=9600)
-    # except serial.serialutil.SerialException as e:
-    #     print("Could not open port: ", str(e))
-    #     return
-    # try:
-    #     ser2 = serial.Serial(port='COM7', baudrate=9600)
-    # except serial.serialutil.SerialException as e:
-    #     print("Could not open port: ", str(e))
-    #     return
-    # while True:
-    #     global line1
-    #     global line2
-    #     global slowDown
-    #     global speedup
-    #     global words
-    #     global accel3orientation
-    #     global accel4orientation
-    #     global isStretching
-    #     global isCompressing
-    #     global isCrumbling
-    #     global glitch
-    #     global folded
-    #     global flip
-    #     global reverse
-        # try:
-        #     line1 = ser1.readline().decode('utf-8', errors='replace').strip()
-        # except UnicodeDecodeError as e:
-        #     print(f"UnicodeDecodeError: {e}")
-        #     # Handle the error as needed, e.g., logging or continuing with a placeholder value
-        #     line1 = "Error: Unable to decode"
-
-        # try:
-        #     line2 = ser2.readline().decode('utf-8', errors='replace').strip()
-        # except UnicodeDecodeError as e:
-        #     print(f"UnicodeDecodeError: {e}")
-        #     # Handle the error as needed, e.g., logging or continuing with a placeholder value
-        #     line2 = "Error: Unable to decode"
-            
-        # mainData = line2 + " " + line1
-        # words = mainData.split()
-        # print(words)
-        # ignoreAccelerometer = False
-        # if(len(words) > 6):
-        #     accel1orientation = words[0]
-        #     accel2orientation = words[1]
-        #     accel3orientation = words[2]
-        #     accel4orientation = words[3]
-        #     isStretching = words[4]
-        #     isCrumbling = words[5]
-        #     isCompressing = words[6]
-        
-        
-        # if(isCrumbling == "crumble"):
-        #     glitch = True
-        # else:
-        #     glitch = False
-        
-        # glitch = False
-        
-        # if(isStretching == "stretching"):
-        #     glitch = False
-        #     slowDown = True
-        # else:
-        #     slowDown = False
-        
-        # if(isCompressing == "compress"):
-        #     speedup = True
-        #     ignoreAccelerometer = True
-        #     slowDown = False
-        # else:
-        #     speedup = False
-        # if(not ignoreAccelerometer):
-        #     if(accel3orientation == "3-Z-up" and accel4orientation == "4-Z-up"):
-        #         folded = False
-        #         reverse = False
-        #     else:
-        #         if(isCrumbling == "crumble"):
-        #             glitch = False
-        #             reverse = True
-        #         else:
-        #             glitch = False
-        #         folded = True
-        #         glitch = False
-        #         speedup = False
-        #         slowDown = False
-        #         if(accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down"):
-        #             flip = True
-        #             folded = False
-        #         else:
-        #             flip = False
-            
-        # if(line1.find("play") == -1):
-        #     folded = False
-        # else:
-        #     folded = True
-        # global intenseSpin
-        # if(line1.find("normalspeed") == -1):
-        #     intenseSpin = False
-        # else:
-        #     intenseSpin = True
+        time.sleep(0.05)
 
 def analyzeData():
     global words
@@ -180,6 +76,7 @@ def analyzeData():
     global flip
     global slowDown
     global speedup
+    global reverse
     
     
     while True:
@@ -195,12 +92,15 @@ def analyzeData():
             isCompressing = words[6]
             
         if(isCrumbling == "crumble"):
-            if(accel1orientation == "1-Z-up" and accel2orientation == "2-Z-up" and accel3orientation == "3-Z-up" and accel4orientation == "4-Z-up"):
-                pass
+            if((accel1orientation == "1-Z-up" and accel2orientation == "2-Z-up" and accel3orientation == "3-Z-up" and accel4orientation == "4-Z-up") or folded):
+                glitch = False
             else:
-                glitch = True
+                crumbleCount = crumbleCount + 1
+                if(crumbleCount > 5):
+                    glitch = True
         else:
             glitch = False
+            crumbleCount = 0
         
         if(isStretching == "stretching"):
             slowDown = True
@@ -211,22 +111,29 @@ def analyzeData():
         if(isCompressing == "compress"):
             speedup = True
             glitch = False
+            slowDown = False
         else:
             speedup = False
             
-        if(accel1orientation == "1-Z-up" and accel2orientation == "2-Z-up" and accel3orientation == "3-Z-up" and accel4orientation == "4-Z-up"):
+        
+        if((accel1orientation == "1-Z-down" and accel2orientation == "2-Z-down" and accel3orientation == "3-Z-down" or accel4orientation == "4-Z-down") or (accel1orientation == "1-Z-down" and accel2orientation == "2-Z-down" or accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down") or (accel1orientation == "1-Z-down" or accel2orientation == "2-Z-down" and accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down")):
+            reverse = True
             folded = False
+            glitch = False
         else:
-            # if()
-            folded = True
-        
-        if(accel1orientation == "1-Z-down" and accel2orientation == "2-Z-down" and accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down"):
-            flip = False
-        else:
-            flip = True
+            reverse = False
             
+        if(accel1orientation == "1-Z-up" and accel2orientation == "2-Z-up" and accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down"):
+            folded = True
+            reverse = False
         
-        time.sleep(0.2)
+        if(accel1orientation == "1-Z-down" and accel2orientation == "2-Z-up" and accel3orientation == "3-Z-up" and accel4orientation == "4-Z-down"):
+            folded = True
+            reverse = False
+        else:
+            folded = False
+        
+        time.sleep(0.05)
     
 def apply_glitch_effect(frame, translation_amount: int):
     # Duplicate the frame
@@ -289,6 +196,15 @@ def applySharpening(image, display=True):
         # Return the output image.
         return output_image
 
+def slitscanVideo(frame, height, width):
+    half = int(width/2)
+    blank_image = np.zeros((height, width+half, 3), np.uint8)
+    small = cv2.resize(frame, (width, height) )
+    blank_image[:, half+1:width+half] = blank_image[:, half:width+half-1]
+    blank_image[:, half] = small[:, half]
+    blank_image[:, 0:half] = small[:, 0:half]
+    return blank_image
+
 def run_video():
     global wasGlitching
     global glitch
@@ -311,6 +227,8 @@ def run_video():
 
     speed_up_factor = 1
     reverse = False
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 3840*2)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160*2)
 
     while True:
         # Read a frame from the video
@@ -357,6 +275,7 @@ def run_video():
         if (slowDown):
             speed_up_factor = 0.3
         
+        # frame = slitscanVideo(frame, cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         # Play pause functionality
         if(folded):
             cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 1)
@@ -366,8 +285,11 @@ def run_video():
         #     reverse = not reverse
         if key == 27:  # If 'Esc' key was pressed
             break
-        # if reverse:
-            # cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 2)
+        if reverse:
+            speed_up_factor = 10
+            cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 2)
+            if(cap.get(cv2.CAP_PROP_POS_FRAMES) == 0):
+                cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_FRAME_COUNT)-1)
 
     cap.release()
     cv2.destroyAllWindows()
