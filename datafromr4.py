@@ -1,3 +1,9 @@
+'''
+Author: Hayat Tamboli
+Date: 2024-04-14
+Description: This file reads data from the serial port of the Arduino UNO R4 and stores it in a queue.
+'''
+
 import serial
 import serial.serialutil
 import queue

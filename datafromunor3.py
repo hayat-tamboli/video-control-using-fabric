@@ -1,7 +1,12 @@
+'''
+Author: Hayat Tamboli
+Date: 2024-04-14
+Description: This file reads data from the serial port of the Arduino UNO R3 and stores it in a queue.
+'''
+
 import serial
 import serial.serialutil
 import queue
-import threading
 
 line = ""
 words = []
@@ -28,3 +33,5 @@ def readDataFromR3():
         words = line.split()
         # print(words)
         words_queue2.put(words)
+
+# readDataFromR3()
