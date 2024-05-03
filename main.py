@@ -93,9 +93,11 @@ def analyzeData():
             isCrumbling = combinedSensorData[5]
             isCompressing = combinedSensorData[6]
         
+        clothFaceDown = ((accel1orientation == "1-Z-down" and accel2orientation == "2-Z-down" and accel3orientation == "3-Z-down" or accel4orientation == "4-Z-down") or (accel1orientation == "1-Z-down" and accel2orientation == "2-Z-down" or accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down") or (accel1orientation == "1-Z-down" or accel2orientation == "2-Z-down" and accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down"))
+        clothFaceUp = (accel1orientation == "1-Z-up" and accel2orientation == "2-Z-up" and accel3orientation == "3-Z-up" and accel4orientation == "4-Z-up")
         # condtion to check if the video should glitch   
         if(isCrumbling == "crumble"):
-            if((accel1orientation == "1-Z-up" and accel2orientation == "2-Z-up" and accel3orientation == "3-Z-up" and accel4orientation == "4-Z-up") or folded):
+            if(clothFaceUp or folded):
                 glitch = False
             else:
                 crumbleCount = crumbleCount + 1
@@ -118,9 +120,8 @@ def analyzeData():
             slowDown = False
         else:
             speedup = False
-            
         
-        if((accel1orientation == "1-Z-down" and accel2orientation == "2-Z-down" and accel3orientation == "3-Z-down" or accel4orientation == "4-Z-down") or (accel1orientation == "1-Z-down" and accel2orientation == "2-Z-down" or accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down") or (accel1orientation == "1-Z-down" or accel2orientation == "2-Z-down" and accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down")):
+        if clothFaceDown:
             reverse = True
             folded = False
             glitch = False
@@ -224,7 +225,6 @@ def run_video():
             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             ret, frame = cap.read()
 
-
         if glitch:
             frame = apply_glitch_effect(frame, random.randint(-20, 20))
             cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) - 1)
@@ -281,10 +281,7 @@ def run_video():
     cap.release()
     cv2.destroyAllWindows()
 
-# if __name__ == "__main__":
-#     main()
-
-# to run 2 loops at the same time
+# to run 5 loops/threads at the same time
 arduino_thread = threading.Thread(target=receive_data_from_arduino)
 data_analysis_thread = threading.Thread(target=analyzeData)
 arduino_thread1 = threading.Thread(target=readDataFromR4)
