@@ -11,10 +11,12 @@ import serial.serialutil
 import threading
 import numpy as np
 import time
+
 import matplotlib.pyplot as plt
 
 from datafromr4 import readDataFromR4, words_queue1
 from datafromunor3 import readDataFromR3, words_queue2
+from videoeffects import apply_glitch_effect, grayscaleVideo, pixelateVideo
 
 folded = False # True make the video paused, False make the video play
 speedup = False # True makes the video Speed up, False makes the video play at normal speed
@@ -61,16 +63,8 @@ def receive_data_from_arduino():
 
 # Function to analyze the data from the Arduino UNO R4 and R3 and control the video playback
 def analyzeData():
-    global combinedSensorData
     global r4SensorData
     global r3SensorData
-    global accel1orientation
-    global accel2orientation
-    global accel3orientation
-    global accel4orientation
-    global isStretching
-    global isCompressing
-    global isCrumbling
     global glitch
     global folded
     global flip
@@ -80,33 +74,9 @@ def analyzeData():
     
     
     while True:
-        # combine the data from the two sensors
-        combinedSensorData = r4SensorData + r3SensorData
-        # data would look like this: ['1-Z-up', '2-Z-up', '3-Z-up', '4-Z-up', 'stretching', 'crumble', 'compress']
-        print("Data fromm Sensors: ", combinedSensorData)
-        if(len(combinedSensorData) > 6):
-            accel1orientation = combinedSensorData[0]
-            accel2orientation = combinedSensorData[1]
-            accel3orientation = combinedSensorData[2]
-            accel4orientation = combinedSensorData[3]
-            isStretching = combinedSensorData[4]
-            isCrumbling = combinedSensorData[5]
-            isCompressing = combinedSensorData[6]
-        
-        clothFaceDown = ((accel1orientation == "1-Z-down" and accel2orientation == "2-Z-down" and accel3orientation == "3-Z-down" or accel4orientation == "4-Z-down") or (accel1orientation == "1-Z-down" and accel2orientation == "2-Z-down" or accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down") or (accel1orientation == "1-Z-down" or accel2orientation == "2-Z-down" and accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down"))
-        clothFaceUp = (accel1orientation == "1-Z-up" and accel2orientation == "2-Z-up" and accel3orientation == "3-Z-up" and accel4orientation == "4-Z-up")
-        # condtion to check if the video should glitch   
-        if(isCrumbling == "crumble"):
-            if(clothFaceUp or folded):
-                glitch = False
-            else:
-                crumbleCount = crumbleCount + 1
-                # added to remove unnecessary glitching
-                if(crumbleCount > 5):
-                    glitch = True
-        else:
-            glitch = False
-            crumbleCount = 0
+        CombiningAndDistributingDataFromSensors()
+        clothFaceDown, clothFaceUp = FlatClothDirection()
+        glitch = isClothGettingCompressed(clothFaceUp)
         
         if(isStretching == "stretching"):
             slowDown = True
@@ -140,57 +110,52 @@ def analyzeData():
         
         time.sleep(0.05)
 
-# Function to apply the glitch effect to the video
-def apply_glitch_effect(frame, translation_amount: int):
-    # Duplicate the frame
-    glitch_frame = frame.copy()
+def isClothGettingCompressed(clothFaceUp):
+    global crumbleCount
+    global isCrumbling
+    if(isCrumbling == "crumble"):
+        if(clothFaceUp or folded):
+            return False
+        else:
+            crumbleCount = crumbleCount + 1
+            # added to remove unnecessary glitching
+            if(crumbleCount > 5):
+                return True
+    else:
+        crumbleCount = 0
+        return False
 
-    # Apply translation to one of the copies
-    rows, cols, _ = glitch_frame.shape
-    M = np.float32([[1, 0, translation_amount], [0, 1, translation_amount]]) # type: ignore
-    glitch_frame = cv2.warpAffine(glitch_frame, M, (cols, rows)) # type: ignore
+def FlatClothDirection():
+    global accel1orientation
+    global accel2orientation
+    global accel3orientation
+    global accel4orientation
+    clothFaceDown = ((accel1orientation == "1-Z-down" and accel2orientation == "2-Z-down" and accel3orientation == "3-Z-down" or accel4orientation == "4-Z-down") or (accel1orientation == "1-Z-down" and accel2orientation == "2-Z-down" or accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down") or (accel1orientation == "1-Z-down" or accel2orientation == "2-Z-down" and accel3orientation == "3-Z-down" and accel4orientation == "4-Z-down"))
+    clothFaceUp = (accel1orientation == "1-Z-up" and accel2orientation == "2-Z-up" and accel3orientation == "3-Z-up" and accel4orientation == "4-Z-up")
+    return clothFaceDown,clothFaceUp
 
-    # Blend the original frame and glitched frame together
-    alpha = 0.5  # Adjust blending level
-    result = cv2.addWeighted(frame, alpha, glitch_frame, 1 - alpha, 0)
+def CombiningAndDistributingDataFromSensors():
+    global accel1orientation
+    global accel2orientation
+    global accel3orientation
+    global accel4orientation
+    global isStretching
+    global isCompressing
+    global isCrumbling
+    global combinedSensorData
+    # combine the data from the two sensors
+    combinedSensorData = r4SensorData + r3SensorData
+    # data would look like this: ['1-Z-up', '2-Z-up', '3-Z-up', '4-Z-up', 'stretching', 'crumble', 'compress']
+    print("Data from Sensors: ", combinedSensorData)
+    if(len(combinedSensorData) > 6):
+        accel1orientation = combinedSensorData[0]
+        accel2orientation = combinedSensorData[1]
+        accel3orientation = combinedSensorData[2]
+        accel4orientation = combinedSensorData[3]
+        isStretching = combinedSensorData[4]
+        isCrumbling = combinedSensorData[5]
+        isCompressing = combinedSensorData[6]
 
-    return result
-
-# Function to flip the video
-def flipVideo(frame):
-    return cv2.flip(frame, 1)
-
-# Function to convert the video to grayscale
-def grayscaleVideo(frame):
-    return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-# Function to pixelate the video
-def pixelateVideo(frame):
-    # Get input size
-    height, width = frame.shape[:2]
-
-    # Desired "pixelated" size
-    w, h = (128, 128)
-
-    # Resize input to "pixelated" size
-    temp = cv2.resize(frame, (w, h), interpolation=cv2.INTER_LINEAR)
-
-    # Initialize output image
-    frame = cv2.resize(temp, (width, height), interpolation=cv2.INTER_NEAREST)
-
-    return frame
-
-# Function to apply the slitscan effect to the video
-# TODO: Debug this function
-# TODO: allows changes in axis and direction of slitscan
-def slitscanVideo(frame, height, width):
-    half = int(width/2)
-    blank_image = np.zeros((height, width+half, 3), np.uint8)
-    small = cv2.resize(frame, (width, height) )
-    blank_image[:, half+1:width+half] = blank_image[:, half:width+half-1]
-    blank_image[:, half] = small[:, half]
-    blank_image[:, 0:half] = small[:, 0:half]
-    return blank_image
 
 # Function to run the video !!!!!!!!!!!!!!!!!!!!
 def run_video():
@@ -233,9 +198,6 @@ def run_video():
         if(glitch and wasGlitching):
             cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) + random.randint(1, 20))
             wasGlitching = False;
-
-        # if flip:
-        #     frame = flipVideo(frame)
 
         if grayscale:
             frame = grayscaleVideo(frame)
