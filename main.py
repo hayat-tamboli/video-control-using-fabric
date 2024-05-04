@@ -9,10 +9,7 @@ import cv2
 import serial
 import serial.serialutil
 import threading
-import numpy as np
 import time
-
-import matplotlib.pyplot as plt
 
 from datafromr4 import readDataFromR4, words_queue1
 from datafromunor3 import readDataFromR3, words_queue2

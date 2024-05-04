@@ -1,7 +1,12 @@
+'''
+Author: Hayat Tamboli
+Date: 2024-05-04
+Description: This file contains functions to apply various effects to a video
+'''
+
 import cv2
 import numpy as np
 
-# Function to apply the glitch effect to the video
 def apply_glitch_effect(frame, translation_amount: int):
     # Duplicate the frame
     glitch_frame = frame.copy()
@@ -17,15 +22,12 @@ def apply_glitch_effect(frame, translation_amount: int):
 
     return result
 
-# Function to flip the video
 def flipVideo(frame):
     return cv2.flip(frame, 1)
 
-# Function to convert the video to grayscale
 def grayscaleVideo(frame):
     return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-# Function to pixelate the video
 def pixelateVideo(frame):
     # Get input size
     height, width = frame.shape[:2]
@@ -41,7 +43,6 @@ def pixelateVideo(frame):
 
     return frame
 
-# Function to apply the slitscan effect to the video
 # TODO: Debug this function
 # TODO: allows changes in axis and direction of slitscan
 def slitscanVideo(frame, height, width):
